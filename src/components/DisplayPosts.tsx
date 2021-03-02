@@ -75,7 +75,7 @@ const DisplayPosts = () => {
 					<br />
 					<span>
 						<DeletePost postId={post.id} />
-						<EditPost />
+						<EditPost post={post} />
 					</span>
 				</div>
 			))}

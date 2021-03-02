@@ -37,7 +37,7 @@ const CreatePost = () => {
 		}));
 
 	React.useEffect(() => {
-		const setCurrentUser = async () => {
+		const setCurrentUser = async (): Promise<void> => {
 			const user = await Auth.currentUserInfo();
 
 			setState((prev) => ({
