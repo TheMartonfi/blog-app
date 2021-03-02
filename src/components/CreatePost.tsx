@@ -1,6 +1,6 @@
 import React from "react";
 import { createPost } from "graphql/mutations";
-import { API, graphqlOperation } from "aws-amplify";
+import { API, graphqlOperation, Auth } from "aws-amplify";
 
 const CreatePost = () => {
 	const [state, setState] = React.useState({
@@ -35,7 +35,17 @@ const CreatePost = () => {
 		}));
 
 	React.useEffect(() => {
-		// Todo
+		const setCurrentUser = async () => {
+			const user = await Auth.currentUserInfo();
+
+			setState((prev) => ({
+				...prev,
+				postOwnerId: user.attributes.sub,
+				postOwnerUsername: user.username
+			}));
+		};
+
+		setCurrentUser();
 	}, []);
 
 	return (
