@@ -18,7 +18,7 @@ const DisplayPosts = () => {
 	const [posts, setPosts] = React.useState<Post[]>([]);
 
 	React.useEffect(() => {
-		const getPosts = async () => {
+		const getPosts = async (): Promise<void> => {
 			const result = (await API.graphql(graphqlOperation(listPosts))) as {
 				data: ListPostsQuery;
 			};
@@ -26,7 +26,7 @@ const DisplayPosts = () => {
 			setPosts(result.data.listPosts.items);
 		};
 
-		const createPostListener = () => {
+		const createPostListener = (): (() => void) => {
 			const subscription = API.graphql(graphqlOperation(onCreatePost));
 
 			if (subscription instanceof Observable) {
@@ -65,7 +65,7 @@ const DisplayPosts = () => {
 				<div key={post.id} className="posts" style={rowStyle}>
 					<h1>{post.postTitle}</h1>
 					<span style={{ fontStyle: "italic", color: "#0ca5e297" }}>
-						{`Wrote by: ${post.postOwnerUsername}`}
+						{`Written by: ${post.postOwnerUsername}`}
 						{" on "}
 						<time style={{ fontStyle: "italic" }}>
 							{new Date(post.createdAt).toDateString()}
@@ -74,7 +74,7 @@ const DisplayPosts = () => {
 					<p>{post.postBody}</p>
 					<br />
 					<span>
-						<DeletePost />
+						<DeletePost postId={post.id} />
 						<EditPost />
 					</span>
 				</div>

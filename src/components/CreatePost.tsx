@@ -10,7 +10,9 @@ const CreatePost = () => {
 		postBody: ""
 	});
 
-	const handleAddPost = async (event: React.FormEvent<HTMLFormElement>) => {
+	const handleAddPost = async (
+		event: React.FormEvent<HTMLFormElement>
+	): Promise<void> => {
 		event.preventDefault();
 
 		const input = {
@@ -28,7 +30,7 @@ const CreatePost = () => {
 
 	const handleChangePost = (
 		event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-	) =>
+	): void =>
 		setState((prev) => ({
 			...prev,
 			[event.target.name]: event.target.value
