@@ -1,9 +1,11 @@
 import React from "react";
 import { listPosts } from "graphql/queries";
 import { API, graphqlOperation } from "aws-amplify";
-import { ListPostsQuery } from "graphql/api";
+import { ListPostsQuery, OnCreatePostSubscription, Post } from "graphql/api";
+import { onCreatePost } from "graphql/subscriptions";
 import DeletePost from "components/DeletePost";
 import EditPost from "components/EditPost";
+import Observable from "zen-observable-ts";
 
 const rowStyle = {
 	background: "#f4f4f4",
@@ -13,7 +15,7 @@ const rowStyle = {
 };
 
 const DisplayPosts = () => {
-	const [posts, setPosts] = React.useState<ListPostsQuery>();
+	const [posts, setPosts] = React.useState<Post[]>([]);
 
 	React.useEffect(() => {
 		const getPosts = async () => {
@@ -21,17 +23,45 @@ const DisplayPosts = () => {
 				data: ListPostsQuery;
 			};
 
-			setPosts(result.data);
+			setPosts(result.data.listPosts.items);
+		};
+
+		const createPostListener = () => {
+			const subscription = API.graphql(graphqlOperation(onCreatePost));
+
+			if (subscription instanceof Observable) {
+				const sub = subscription.subscribe({
+					next: (postData: { value: { data: OnCreatePostSubscription } }) => {
+						const newPost = postData.value.data.onCreatePost;
+						const prevPosts = posts.filter((post) => post.id !== newPost.id);
+
+						const updatedPosts = [newPost, ...prevPosts];
+
+						setPosts(updatedPosts);
+					}
+				});
+
+				return () => sub.unsubscribe();
+			}
 		};
 
 		getPosts();
-	}, []);
+
+		return createPostListener();
+	}, [posts]);
 
 	if (!posts) return <div>Loading...</div>;
 
+	posts.sort((a, b) => {
+		const aDate = new Date(a.createdAt);
+		const bDate = new Date(b.createdAt);
+
+		return aDate > bDate ? -1 : 1;
+	});
+
 	return (
 		<div>
-			{posts.listPosts.items.map((post) => (
+			{posts.map((post) => (
 				<div key={post.id} className="posts" style={rowStyle}>
 					<h1>{post.postTitle}</h1>
 					<span style={{ fontStyle: "italic", color: "#0ca5e297" }}>
