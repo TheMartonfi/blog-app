@@ -23,7 +23,8 @@ import DeletePost from "components/DeletePost";
 import EditPost from "components/EditPost";
 import CreateCommentPost from "components/CreateCommentPost";
 import CommentPost from "components/CommentPost";
-import { FaThumbsUp } from "react-icons/fa";
+import UserWhoLikedPost from "components/UserWhoLikedPost";
+import { FaThumbsUp, FaSadTear } from "react-icons/fa";
 import Observable from "zen-observable-ts";
 
 const rowStyle = {
@@ -38,7 +39,7 @@ const DisplayPosts = () => {
 	const [state, setState] = React.useState({
 		ownerId: "",
 		ownerUsername: "",
-		errorMessage: "",
+		error: { message: "", postId: "" },
 		postLikedBy: [],
 		isHovering: false
 	});
@@ -59,7 +60,7 @@ const DisplayPosts = () => {
 		if (likedPost(postId))
 			return setState((prev) => ({
 				...prev,
-				errorMessage: "Can't like your own post."
+				error: { message: "Can't like your own post.", postId }
 			}));
 
 		const input = {
@@ -78,6 +79,30 @@ const DisplayPosts = () => {
 		} catch (e) {
 			console.error(e);
 		}
+	};
+
+	const handleMouseHover = async (postId: string): Promise<void> => {
+		setState((prev) => {
+			const innerLikes = [...prev.postLikedBy];
+
+			for (const post of posts) {
+				if (post.id === postId) {
+					for (const like of post.likes.items) {
+						innerLikes.push(like.likeOwnerUsername);
+					}
+				}
+			}
+
+			return { ...prev, isHovering: !prev.isHovering, postLikedBy: innerLikes };
+		});
+	};
+
+	const handleMouseLeave = async (): Promise<void> => {
+		setState((prev) => ({
+			...prev,
+			isHovering: !prev.isHovering,
+			postLikedBy: []
+		}));
 	};
 
 	React.useEffect(() => {
@@ -264,11 +289,31 @@ const DisplayPosts = () => {
 						)}
 						<span>
 							<p className="alert">
-								{post.postOwnerId === state.ownerId && state.errorMessage}
+								{post.id === state.error.postId && state.error.message}
 							</p>
-							<p onClick={() => handleLike(post.id)}>
+							<p
+								className="like-button"
+								style={{ color: post.likes.items.length > 0 ? "blue" : "gray" }}
+								onClick={() => handleLike(post.id)}
+								onMouseEnter={() => handleMouseHover(post.id)}
+								onMouseLeave={handleMouseLeave}
+							>
 								<FaThumbsUp /> {post.likes.items.length}
 							</p>
+							{state.isHovering && (
+								<div className="users-liked">
+									{state.postLikedBy.length === 0 ? (
+										<>
+											Like by no one <FaSadTear />
+										</>
+									) : (
+										<>
+											Liked by:{" "}
+											<UserWhoLikedPost postLikedBy={state.postLikedBy} />
+										</>
+									)}
+								</div>
+							)}
 						</span>
 					</span>
 					<span>
