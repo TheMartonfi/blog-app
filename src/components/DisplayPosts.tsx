@@ -1,24 +1,29 @@
 import React from "react";
 import { listPosts } from "graphql/queries";
-import { API, graphqlOperation } from "aws-amplify";
+import { API, graphqlOperation, Auth } from "aws-amplify";
 import {
 	ListPostsQuery,
 	OnCreatePostSubscription,
 	OnUpdatePostSubscription,
 	OnDeletePostSubscription,
 	OnCreateCommentSubscription,
+	OnCreateLikeSubscription,
+	CreateLikeMutation,
 	Post
 } from "graphql/api";
 import {
 	onCreatePost,
 	onUpdatePost,
 	onDeletePost,
-	onCreateComment
+	onCreateComment,
+	onCreateLike
 } from "graphql/subscriptions";
+import { createLike } from "graphql/mutations";
 import DeletePost from "components/DeletePost";
 import EditPost from "components/EditPost";
 import CreateCommentPost from "components/CreateCommentPost";
 import CommentPost from "components/CommentPost";
+import { FaThumbsUp } from "react-icons/fa";
 import Observable from "zen-observable-ts";
 
 const rowStyle = {
@@ -29,9 +34,63 @@ const rowStyle = {
 };
 
 const DisplayPosts = () => {
-	const [posts, setPosts] = React.useState<Post[]>([]);
+	const [posts, setPosts] = React.useState<Post[]>();
+	const [state, setState] = React.useState({
+		ownerId: "",
+		ownerUsername: "",
+		errorMessage: "",
+		postLikedBy: [],
+		isHovering: false
+	});
+
+	const likedPost = (postId: string): boolean => {
+		for (const post of posts) {
+			if (post.id === postId) {
+				if (post.postOwnerId === state.ownerId) return true;
+				for (const like of post.likes.items) {
+					if (like.likeOwnerId === state.ownerId) return true;
+				}
+			}
+		}
+		return false;
+	};
+
+	const handleLike = async (postId: string): Promise<void> => {
+		if (likedPost(postId))
+			return setState((prev) => ({
+				...prev,
+				errorMessage: "Can't like your own post."
+			}));
+
+		const input = {
+			numberLikes: 1,
+			likeOwnerId: state.ownerId,
+			likeOwnerUsername: state.ownerUsername,
+			likePostId: postId
+		};
+
+		try {
+			const result = (await API.graphql(
+				graphqlOperation(createLike, { input })
+			)) as { data: CreateLikeMutation };
+
+			console.log("Liked: ", result.data);
+		} catch (e) {
+			console.error(e);
+		}
+	};
 
 	React.useEffect(() => {
+		const setCurrentUser = async (): Promise<void> => {
+			const user = await Auth.currentUserInfo();
+
+			setState((prev) => ({
+				...prev,
+				ownerId: user.attributes.sub,
+				ownerUsername: user.username
+			}));
+		};
+
 		const getPosts = async (): Promise<void> => {
 			const result = (await API.graphql(graphqlOperation(listPosts))) as {
 				data: ListPostsQuery;
@@ -127,18 +186,46 @@ const DisplayPosts = () => {
 			}
 		};
 
+		const createLikeListener = (): (() => void) | undefined => {
+			const subscription = API.graphql(graphqlOperation(onCreateLike));
+
+			if (subscription instanceof Observable) {
+				const sub = subscription.subscribe({
+					next: (postData: { value: { data: OnCreateLikeSubscription } }) => {
+						const createdLike = postData.value.data.onCreateLike;
+						setPosts((prev) => {
+							const prevCopy = [...prev];
+
+							prevCopy.forEach((post) => {
+								if (createdLike.post.id === post.id) {
+									post.likes.items.push(createdLike);
+								}
+							});
+
+							return prevCopy;
+						});
+					}
+				});
+
+				return (): void => sub.unsubscribe();
+			}
+		};
+
+		setCurrentUser();
 		getPosts();
 
 		const unsubscribeCreatePost = createPostListener();
 		const unsubscribeUpdatePost = updatePostListener();
 		const unsubscribeDeletePost = deletePostListener();
 		const unsubscribeCreateComment = createCommentListener();
+		const unsubscribeCreateLike = createLikeListener();
 
 		const cleanup = (): void => {
 			unsubscribeCreatePost();
 			unsubscribeUpdatePost();
 			unsubscribeDeletePost();
 			unsubscribeCreateComment();
+			unsubscribeCreateLike();
 		};
 
 		return cleanup;
@@ -169,8 +256,20 @@ const DisplayPosts = () => {
 					<p>{post.postBody}</p>
 					<br />
 					<span>
-						<DeletePost postId={post.id} />
-						<EditPost post={post} />
+						{post.postOwnerId === state.ownerId && (
+							<>
+								<DeletePost postId={post.id} />
+								<EditPost post={post} />
+							</>
+						)}
+						<span>
+							<p className="alert">
+								{post.postOwnerId === state.ownerId && state.errorMessage}
+							</p>
+							<p onClick={() => handleLike(post.id)}>
+								<FaThumbsUp /> {post.likes.items.length}
+							</p>
+						</span>
 					</span>
 					<span>
 						<CreateCommentPost postId={post.id} />
